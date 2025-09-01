@@ -1,79 +1,54 @@
-# Xeus-Lite demo
+# C语言学习笔记本
 
-[![lite-badge](https://jupyterlite.rtfd.io/en/latest/_static/badge.svg)](https://jupyterlite.github.io/xeus-lite-demo/notebooks/?path=demo.ipynb)
+参数书目：电子科技大学出版的教材《C与C++程序设计》 戴波 主编；陈文宇 丘志杰 卢光辉 副主编
 
-This GitHub template allows you to create deployments of JupyterLite with a custom set of conda packages.
+本项目包含一系列 Jupyter Notebook，用于初学者学习 **C 语言** 基础知识与编程技巧。 
 
-## 💡 How to make your own deployment
+笔记本内容涵盖： （章节编排与《C与C++程序设计》一书相同）
+- C语言程序设计概述 
+- 基本数据类型及运算 
+- 控制语句 
+- 数组与结构
+- 指针
+- 函数
 
-Creating a new deployment can be done in three easy steps:
 
-**Step 1: Apply the GitHub template**
+---
 
-1. Click the **"Use this template"** button in the upper right corner of the GitHub repository.
-2. Choose a name for your project and select the GitHub organization where you want to create it.
-3. Then hit **"Create repository from template"** to finalize the setup.
+## 使用方法
 
-**Step 2: Enable building the GitHub pages from GitHub actions.**
+1. 克隆或下载本仓库到本地； 
+2. 打开 JupyterLab / JupyterLite，选择 **C/C++ Kernel**（ `xeus-cpp` ）。  xeus-cpp需自行安装，安装方法请参考：https://github.com/compiler-research/xeus-cpp
+3. 运行笔记本中的代码单元，跟随注释学习和修改。  
 
-1. Once your repository is created, enable GitHub Pages by configuring GitHub Actions. This will build and deploy your site automatically.
-2. Your deployment will be accessible at the following URL: https://{USERNAME}.github.io/{DEMO_REPO_NAME}.
+或直接在 [JupyterLite 页面](https://luckymark.github.io/c_course) 上在线运行。
 
-**Step 3: Customize your conda environment**
+---
 
-1. Update your ``environment.yml`` file to include the required packages.
-2. This ensures that your environment has all the necessary dependencies.
+## 注意事项
 
-## 🎬 Visual Guide
+- 当前所用的 **Jupyter Kernel** 并不完全支持标准 C 的所有输入输出函数。  
+- 特别是 **`scanf`** 在交互式 Notebook 环境中不可用。  
+  - 例如，以下代码在 Notebook 中无法运行：  
+    ```c
+    int a;
+    scanf("%d", &a);
+    ```
+- 推荐使用 **C++ 风格的 `std::cin`** 替代输入：  
+    ```cpp
+    int a;
+    std::cin >> a;
+    ```
+- 其余代码（如 `printf` 输出、指针、数组、结构体、函数等）均可正常使用。  
 
-For a step-by-step visual guide, check out the screencast below:
+---
 
-![Deploy your own](deploy.gif)
+## 建议
 
-## 📦 How to install kernels and packages
+- 初学者可以按章节顺序学习。  
+- 笔记本内附有大量示例，建议边学边改，尝试不同的输入与输出。  
+- 学习完成后，可以尝试将 Notebook 中的代码保存为 `.c` 文件，在本地 GCC 或 Clang 环境中编译运行，以获得完整的 C 语言体验。  
 
-You can install specific kernels and extra packages by adding them to the ``environment.yml`` file.
+---
 
-See https://jupyterlite-xeus.readthedocs.io/en/latest/environment.html for more documentation.
-
-### Example 1: JupyterLite with NumPy and Matplotlib
-
-To create a JupyterLite deployment with NumPy and Matplotlib pre-installed, edit the ``environment.yml`` file as follows:
-
-```yml
-name: xeus-kernel
-channels:
-  - https://repo.prefix.dev/emscripten-forge-dev
-  - https://repo.prefix.dev/conda-forge
-dependencies:
-  - xeus-python
-  - numpy
-  - matplotlib
-```
-
-### Example 2: JupyterLite with R and coursekata
-
-To use the R kernel and the coursekata package, edit the environment.yml file as follows:
-
-```yml
-name: xeus-kernel
-channels:
-  - https://repo.prefix.dev/emscripten-forge-dev
-  - https://repo.prefix.dev/conda-forge
-dependencies:
-  - xeus-r
-  - r-coursekata
-```
-
-### Example 3: JupyterLite with C++
-
-To use the C++ kernel, edit the environment.yml file as follows:
-
-```yml
-name: xeus-kernel
-channels:
-  - https://repo.prefix.dev/emscripten-forge-dev
-  - https://repo.prefix.dev/conda-forge
-dependencies:
-  - xeus-cpp
-```
+祝学习愉快 🚀  
