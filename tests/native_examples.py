@@ -40,21 +40,30 @@ class Notebook(TypedDict):
     cells: list[NotebookCell]
 
 
+def compile_sources(sources: list[Path], executable: Path) -> None:
+    """Compile each translation unit with strict warnings, then link its objects."""
+    compiler: str = os.environ.get("CC", "cc")
+    objects: list[Path] = [executable.parent / f"{executable.name}-{index}.o" for index in range(len(sources))]
+    commands: list[list[str]] = [
+        [compiler, "-std=c17", "-Wall", "-Wextra", "-Wpedantic", "-Werror",
+         "-c", str(source), "-o", str(target)]
+        for source, target in zip(sources, objects, strict=True)
+    ] + [[compiler, *(str(path) for path in objects), "-o", str(executable)]]
+    for command in commands:
+        result: subprocess.CompletedProcess[str] = subprocess.run(
+            command, capture_output=True, text=True, timeout=30, check=False,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"Compilation failed: command={command!r}; exit={result.returncode}\n{result.stderr}")
+
+
 def verify_program(source: str, cases: list[NativeCase], label: str) -> None:
     """Treat compiler warnings, incorrect outputs and unexpected exits as errors."""
     with TemporaryDirectory(prefix="c-course-native-") as directory:
         source_path: Path = Path(directory) / "lesson.c"
         executable: Path = Path(directory) / "lesson"
         source_path.write_text(source, encoding="utf-8")
-        command: list[str] = [
-            os.environ.get("CC", "cc"), "-std=c17", "-Wall", "-Wextra",
-            "-Wpedantic", "-Werror", str(source_path), "-o", str(executable),
-        ]
-        compiled: subprocess.CompletedProcess[str] = subprocess.run(
-            command, capture_output=True, text=True, timeout=30, check=False,
-        )
-        if compiled.returncode != 0:
-            raise RuntimeError(f"{label}: compiler failed: {command!r}\n{compiled.stderr}")
+        compile_sources([source_path], executable)
         for case in cases:
             result: subprocess.CompletedProcess[str] = subprocess.run(
                 [str(executable)], input=case["stdin"], capture_output=True,
@@ -72,7 +81,7 @@ def verify_program(source: str, cases: list[NativeCase], label: str) -> None:
 def check_lessons(root: Path) -> None:
     programs: int = 0
     cases_count: int = 0
-    for path in sorted((root / "content").glob("*.ipynb")):
+    for path in sorted((root / "content").glob("第*章*.ipynb")):
         notebook = cast(Notebook, json.loads(path.read_text(encoding="utf-8")))
         chapter_programs: int = 0
         for index, cell in enumerate(notebook["cells"]):
@@ -86,8 +95,8 @@ def check_lessons(root: Path) -> None:
             programs += 1
             chapter_programs += 1
             cases_count += len(cases)
-        if chapter_programs != 1:
-            raise AssertionError(f"{path.name}: expected one complete local program, got {chapter_programs}")
+        if chapter_programs == 0:
+            raise AssertionError(f"{path.name}: expected at least one complete local program")
         print(f"PASS: {path.name}: native C17", flush=True)
     if programs == 0:
         raise AssertionError("No lesson programs found")

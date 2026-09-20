@@ -31,7 +31,10 @@ jobs:
 
       - name: Test complete C17 programs
         shell: bash -l {0}
-        run: python tests/native_examples.py
+        run: |
+          python tests/native_examples.py
+          python tests/native_projects.py
+          python tests/exercise_solutions.py
 
       - name: Test C17 in Chromium
         shell: bash -l {0}

@@ -17,6 +17,8 @@ from urllib.request import urlopen
 
 from playwright.async_api import Page, Route, async_playwright
 
+from exercise_solutions import Exercise, ProgramCheck, parse_exercises, parse_program_checks
+
 
 class Cell(TypedDict):
     label: str
@@ -183,6 +185,17 @@ async def check_browser(base_url: str) -> None:
             }""")
             print("PASS: functions, repeated cells, sscanf, stdin limitations, kernel restart", flush=True)
             root: Path = Path(__file__).resolve().parents[1]
+            downloads: list[Path] = sorted(
+                path for path in (root / "content" / "practice").rglob("*") if path.is_file()
+            )
+            if not downloads:
+                raise AssertionError("No downloadable practice files found")
+            for path in downloads:
+                relative: str = path.relative_to(root / "content").as_posix()
+                with urlopen(base_url + "/files/" + quote(relative), timeout=30) as response:
+                    if response.read() != path.read_bytes():
+                        raise AssertionError(f"Published practice file differs from source: {relative}")
+            print(f"PASS: {len(downloads)} downloadable practice files", flush=True)
             total: int = 0
             for path in sorted((root / "content").glob("*.ipynb")):
                 with urlopen(base_url + "/files/" + quote(path.name), timeout=30) as response:
@@ -205,6 +218,26 @@ async def check_browser(base_url: str) -> None:
                         require_output(result, expected)
                 total += len(results)
                 print(f"PASS: {path.name}: {len(results)} cells", flush=True)
+                answers: list[Exercise] = parse_exercises(json.dumps(notebook), path.name)
+                if answers:
+                    completed: list[Cell] = [
+                        {"label": answer.label,
+                         "code": "#include <stdio.h>\n#include <string.h>\n" + answer.code}
+                        for answer in answers
+                    ]
+                    checked: list[Result] = await execute(page, completed)
+                    for answer, result in zip(answers, checked, strict=True):
+                        require_output(result, answer.expected_stdout)
+                    print(f"PASS: {path.name}: {len(answers)} exercise answers", flush=True)
+                program_checks: list[ProgramCheck] = parse_program_checks(json.dumps(notebook), path.name)
+                for check in program_checks:
+                    verified: list[Result] = await execute(page, [
+                        {"label": check.label + ":reference", "code": check.declarations},
+                        {"label": check.label + ":checker", "code": check.checker},
+                    ])
+                    require_output(verified[0], "")
+                    require_output(verified[1], check.expected_stdout)
+                    print(f"PASS: {path.name}: reference program + student checker", flush=True)
             print(f"PASS: {total} non-empty course cells", flush=True)
         finally:
             await browser.close()
