@@ -1,0 +1,2 @@
+[dependency-groups]
+test = ["playwright==1.55.0"]
