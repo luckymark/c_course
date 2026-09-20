@@ -31,9 +31,18 @@ class Result(TypedDict):
     input_requests: int
 
 
+class CourseMetadata(TypedDict, total=False):
+    expected_stdout: str
+
+
+class CellMetadata(TypedDict, total=False):
+    course: CourseMetadata
+
+
 class NotebookCell(TypedDict):
     cell_type: str
     source: list[str]
+    metadata: CellMetadata
 
 
 class KernelSpec(TypedDict):
@@ -180,12 +189,20 @@ async def check_browser(base_url: str) -> None:
                     notebook = cast(Notebook, json.load(response))
                 if notebook["metadata"]["kernelspec"]["name"] != "xc17":
                     raise AssertionError(f"Expected C17 metadata: {path.name}")
+                code_cells: list[NotebookCell] = [
+                    cell for cell in notebook["cells"]
+                    if cell["cell_type"] == "code" and "".join(cell["source"]).strip()
+                ]
                 cells: list[Cell] = [
                     {"label": f"{path.name}:cell {index + 1}", "code": "".join(cell["source"])}
                     for index, cell in enumerate(notebook["cells"])
                     if cell["cell_type"] == "code" and "".join(cell["source"]).strip()
                 ]
                 results = await execute(page, cells)
+                for cell, result in zip(code_cells, results, strict=True):
+                    expected: str | None = cell["metadata"].get("course", {}).get("expected_stdout")
+                    if expected is not None:
+                        require_output(result, expected)
                 total += len(results)
                 print(f"PASS: {path.name}: {len(results)} cells", flush=True)
             print(f"PASS: {total} non-empty course cells", flush=True)

@@ -29,6 +29,10 @@ jobs:
           cp README.md content
           jupyter lite build --contents content --output-dir dist
 
+      - name: Test complete C17 programs
+        shell: bash -l {0}
+        run: python tests/native_examples.py
+
       - name: Test C17 in Chromium
         shell: bash -l {0}
         run: |
