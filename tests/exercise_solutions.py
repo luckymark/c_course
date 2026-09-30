@@ -98,11 +98,11 @@ def parse_exercises(notebook_text: str, label: str) -> list[Exercise]:
                 raise ValueError(f"{label}:{exercise_id}: expected one code task cell")
             tasks[exercise_id] = source
         elif role == "solution":
-            blocks: list[str] = re.findall(r"```c\n(.*?)\n```", source, re.DOTALL)
+            blocks: list[str] = re.findall(r"```(?:c|cpp)\n(.*?)\n```", source, re.DOTALL)
             expected: str | None = course.get("expected_stdout")
             if (cell["cell_type"] != "markdown" or len(blocks) != 1
                     or expected is None or exercise_id in solutions):
-                raise ValueError(f"{label}:{exercise_id}: expected one folded C answer and expected_stdout")
+                raise ValueError(f"{label}:{exercise_id}: expected one folded C/C++ answer and expected_stdout")
             solutions[exercise_id] = (blocks[0], expected)
         else:
             raise ValueError(f"{label}:{exercise_id}: invalid exercise_role={role!r}")
@@ -128,6 +128,8 @@ def check_solutions(root: Path) -> None:
     count: int = 0
     program_count: int = 0
     for path in sorted((root / "content").glob("*.ipynb")):
+        if path.name.startswith("C++"):
+            continue  # C++ answers are compiled by native_cpp.py.
         notebook_text: str = path.read_text(encoding="utf-8")
         for exercise in parse_exercises(notebook_text, path.name):
             source: str = (

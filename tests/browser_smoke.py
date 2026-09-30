@@ -62,12 +62,12 @@ class Notebook(TypedDict):
 
 # Execute on an actual kernel; a timeout or execution error fails the test.
 # The application is exposed only in intercepted test responses, never in production.
-RUN_CELLS = """async (cells) => {
-    const kernel = await window.jupyterapp.serviceManager.kernels.startNew({name: 'xc17'});
+RUN_CELLS = """async ({cells, kernelName}) => {
+    const kernel = await window.jupyterapp.serviceManager.kernels.startNew({name: kernelName});
     const results = [];
     try {
         const info = await kernel.info;
-        if (info.implementation_version !== '0.10.0' || info.language_info.version !== 'c17') {
+        if (info.implementation_version !== '0.10.0' || (kernelName === 'xc17' && info.language_info.version !== 'c17')) {
             throw new Error('Unexpected kernel: ' + JSON.stringify(info));
         }
         for (const cell of cells) {
@@ -122,8 +122,8 @@ async def expose_application(route: Route) -> None:
     await route.fulfill(response=response, json=updated)
 
 
-async def execute(page: Page, cells: list[Cell]) -> list[Result]:
-    results = cast(list[Result], await page.evaluate(RUN_CELLS, cells))
+async def execute(page: Page, cells: list[Cell], kernel_name: str = "xc17") -> list[Result]:
+    results = cast(list[Result], await page.evaluate(RUN_CELLS, {"cells": cells, "kernelName": kernel_name}))
     for result in results:
         if result["status"] != "ok" or result["errors"]:
             raise RuntimeError(json.dumps(result, ensure_ascii=False))
@@ -184,6 +184,11 @@ async def check_browser(base_url: str) -> None:
                 }
             }""")
             print("PASS: functions, repeated cells, sscanf, stdin limitations, kernel restart", flush=True)
+            cpp_probe: list[Result] = await execute(page, [
+                {"label": "C++17 standard", "code": '#include <iostream>\nstd::cout << __cplusplus << "\\n";'},
+            ], "xcpp17")
+            require_output(cpp_probe[0], "201703\n")
+            print("PASS: C++17 kernel and language standard", flush=True)
             root: Path = Path(__file__).resolve().parents[1]
             downloads: list[Path] = sorted(
                 path for path in (root / "content" / "practice").rglob("*") if path.is_file()
@@ -200,8 +205,9 @@ async def check_browser(base_url: str) -> None:
             for path in sorted((root / "content").glob("*.ipynb")):
                 with urlopen(base_url + "/files/" + quote(path.name), timeout=30) as response:
                     notebook = cast(Notebook, json.load(response))
-                if notebook["metadata"]["kernelspec"]["name"] != "xc17":
-                    raise AssertionError(f"Expected C17 metadata: {path.name}")
+                kernel_name: str = "xcpp17" if path.name.startswith("C++") else "xc17"
+                if notebook["metadata"]["kernelspec"]["name"] != kernel_name:
+                    raise AssertionError(f"Expected {kernel_name} metadata: {path.name}")
                 code_cells: list[NotebookCell] = [
                     cell for cell in notebook["cells"]
                     if cell["cell_type"] == "code" and "".join(cell["source"]).strip()
@@ -211,7 +217,7 @@ async def check_browser(base_url: str) -> None:
                     for index, cell in enumerate(notebook["cells"])
                     if cell["cell_type"] == "code" and "".join(cell["source"]).strip()
                 ]
-                results = await execute(page, cells)
+                results = await execute(page, cells, kernel_name)
                 for cell, result in zip(code_cells, results, strict=True):
                     expected: str | None = cell["metadata"].get("course", {}).get("expected_stdout")
                     if expected is not None:
@@ -225,7 +231,7 @@ async def check_browser(base_url: str) -> None:
                          "code": "#include <stdio.h>\n#include <string.h>\n" + answer.code}
                         for answer in answers
                     ]
-                    checked: list[Result] = await execute(page, completed)
+                    checked: list[Result] = await execute(page, completed, kernel_name)
                     for answer, result in zip(answers, checked, strict=True):
                         require_output(result, answer.expected_stdout)
                     print(f"PASS: {path.name}: {len(answers)} exercise answers", flush=True)
@@ -246,4 +252,4 @@ async def check_browser(base_url: str) -> None:
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         raise SystemExit("Usage: python tests/browser_smoke.py http://127.0.0.1:8765")
-    asyncio.run(asyncio.wait_for(check_browser(sys.argv[1].rstrip("/")), timeout=600))
+    asyncio.run(asyncio.wait_for(check_browser(sys.argv[1].rstrip("/")), timeout=900))
